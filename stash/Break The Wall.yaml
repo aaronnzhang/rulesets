@@ -1,0 +1,269 @@
+# 规则模式：rule（规则） / global（全局代理）/ direct（全局直连）
+mode: rule
+
+# 设置日志输出级别 (默认级别：silent，即不输出任何内容，以避免因日志内容过大而导致程序内存溢出）。
+# 5 个级别：silent / info / warning / error / debug。级别越高日志输出量越大，越倾向于调试，若需要请自行开启。
+log-level: silent
+
+http:
+  # 开启 MitM 功能的域名列表，需要确保上述 CA 证书已受系统信任
+  mitm:
+    - api.weibo.cn
+  # 使用 JavaScript 脚本改写 HTTP(S) 请求
+  script:
+    - match: ^https:\/\/api\.weibo\.cn\/2\/users\/show\?
+      name: fix-vvebo-user-timeline
+      type: request
+      timeout: 10
+    - match: ^https:\/\/api\.weibo\.cn\/2\/statuses\/user_timeline\?
+      name: fix-vvebo-user-timeline
+      type: request
+      timeout: 10
+    - match: ^https:\/\/api\.weibo\.cn\/2\/profile\/statuses\/tab\?
+      name: fix-vvebo-user-timeline
+      type: response
+      require-body: true
+      timeout: 10
+  # HTTP(S) 重写，支持 header、302、307、reject 多种策略
+  url-rewrite:
+    - ^http://g\.cn http://www.google.com header
+    - ^https?://www\.google\.cn https://www.google.com 302
+
+script-providers:
+  fix-vvebo-user-timeline:
+    url: https://raw.githubusercontent.com/suiyuran/stash/main/scripts/fix-vvebo-user-timeline.js
+    interval: 86400
+
+port: 4780
+socks-port: 4781
+redir-port: 7892
+allow-lan: true
+external-controller: '0.0.0.0:9090'
+secret: ''
+dns:
+  # 支持 UDP / TCP / DoT / DoH 协议的 DNS 服务，可以指明具体的连接端口号。
+  # 所有 DNS 请求将会直接发送到服务器，不经过任何代理。
+  # Stash 会使用最先获得的解析记录回复 DNS 请求
+  nameserver:
+    # 不建议配置超过 2 个 DNS 服务器，会增加系统功耗
+    - tls://223.5.5.5:853
+    - https://223.6.6.6/dns-query
+    - https://120.53.53.53/dns-query
+  # 对部分域名使用单独的 DNS 服务器
+  nameserver-policy:
+    +.tmall.com: 223.5.5.5
+    +.taobao.com: 223.5.5.5
+    +.alicdn.com: 223.5.5.5
+    +.aliyun.com: 223.5.5.5
+    +.alipay.com: 223.5.5.5
+    +.alibaba.com: 223.5.5.5
+    +.qq.com: 119.29.29.29
+    +.tencent.com: 119.29.29.29
+    +.weixin.com: 119.29.29.29
+    +.qpic.cn: 119.29.29.29
+    +.jd.com: 119.29.29.29
+    +.bilibili.com: 119.29.29.29
+    +.hdslb.com: 119.29.29.29
+    +.163.com: 119.29.29.29
+    +.126.com: 119.29.29.29
+    +.126.net: 119.29.29.29
+    +.127.net: 119.29.29.29
+    +.netease.com: 119.29.29.29
+    +.baidu.com: 223.5.5.5
+    +.bdstatic.com: 223.5.5.5
+    +.bilivideo.+: 119.29.29.29
+    +.iqiyi.com: 119.29.29.29
+    +.douyinvod.com: 180.184.1.1
+    +.douyin.com: 180.184.1.1
+    +.douyincdn.com: 180.184.1.1
+    +.douyinpic.com: 180.184.1.1
+    +.feishu.cn: 180.184.1.1
+  # 在以下列表的域名将不会被解析为 fake ip，这些域名相关的解析请求将会返回它们真实的 IP 地址
+  fake-ip-filter:
+    - '*.n.n.srv.nintendo.net'
+    - +.stun.playstation.net
+    - xbox.*.*.microsoft.com
+    - '*.msftncsi.com'
+    - '*.msftconnecttest.com'
+    - WORKGROUP
+    - '*.lan'
+    - stun.*.*.*
+    - stun.*.*
+    - time.windows.com
+    - time.nist.gov
+    - time.apple.com
+    - time.asia.apple.com
+    - '*.ntp.org.cn'
+    - '*.openwrt.pool.ntp.org'
+    - time1.cloud.tencent.com
+    - time.ustc.edu.cn
+    - pool.ntp.org
+    - ntp.ubuntu.com
+    - '*.*.xboxlive.com'
+    - speedtest.cros.wr.pvp.net
+  enable: true
+  listen: '127.0.0.1:53'
+  ipv6: true
+  use-hosts: true
+  enhanced-mode: fake-ip
+  fallback:
+    - 'https://101.101.101.101/dns-query'
+    - 'https://public.dns.iij.jp/dns-query'
+    - 'https://208.67.220.220/dns-query'
+  fallback-filter:
+    geoip: true
+    ipcidr:
+      - 240.0.0.0/4
+      - 0.0.0.0/32
+      - 127.0.0.1/32
+      - 223.75.236.241/32
+    domain:
+      - +.nfcloud.net
+      - +.nfcloud.club
+      - +.nfcloud.life
+      - +.jsdelivr.net
+
+proxy-groups:
+  - name: 🌎Global
+    type: select
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Global.png
+    use:
+      - NFcloud
+      - 100Mbps
+  - name: 📽️Netflix
+    type: select
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Netflix.png
+    proxies:
+      - 🌎Global
+    use:
+      - NFcloud
+  - name: 📽️YouTube
+    type: select
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/YouTube.png
+    proxies:
+      - 🌎Global
+    use:
+      - NFcloud
+  - name: 📽️Disney+
+    type: select
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Disney+.png
+    proxies:
+      - 🌎Global
+    use:
+      - NFcloud
+  - name: 📽️ForeignMedia
+    type: select
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/ForeignMedia.png
+    proxies:
+      - 🌎Global
+    use:
+      - NFcloud
+  - name: ✈️Telegram
+    type: select
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Telegram_X.png
+    proxies:
+      - 🌎Global
+    use:
+      - NFcloud
+      - 100Mbps
+  - name: 🤖chatGPT
+    type: select
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Bot.png
+    proxies:
+      - 🌎Global
+    use:
+      - NFcloud
+  - name: ✉️Mail
+    type: select
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Mail.png
+    proxies:
+      - 🌎Global
+    use:
+      - 100Mbps
+  - name: 🍎Apple
+    type: select
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Apple_2.png
+    proxies:
+      - 🚀Direct
+      - 🌎Global
+  - name: 🚀Direct
+    type: select
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Rocket.png
+    proxies:
+      - DIRECT
+
+proxy-providers:
+  NFcloud:
+    interval: 86400
+    url: https://sub.nfcloud.life/link/2UjkLPlPv9DtSS3T?clash=2
+  100Mbps:
+    interval: 86400
+    url: https://www.100mbps.xyz/subscribe/27/cPXB9dpc0np/clash/
+
+subscribe-url: https://sub.nfcloud.life/link/2UjkLPlPv9DtSS3T?clash=2
+
+rule-providers:
+  global:
+    behavior: domain
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Global/Global_Domain.yaml
+    interval: 86400
+  apple:
+    behavior: domain
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Apple/Apple_Domain.yaml
+    interval: 86400
+  netflix:
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Netflix/Netflix.yaml
+    interval: 86400
+  netflix-ip:
+    behavior: ipcidr
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Netflix/Netflix_IP.yaml
+    interval: 86400
+  youtube:
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/YouTube/YouTube.yaml
+    interval: 86400
+  openai:
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/OpenAI/OpenAI.yaml
+    interval: 86400
+  disney:
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Disney/Disney.yaml
+    interval: 86400
+  foreign-media:
+    behavior: domain
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/GlobalMedia/GlobalMedia_Domain.yaml
+    interval: 86400
+  telegram:
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Telegram/Telegram.yaml
+    interval: 86400
+  mail:
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Mail/Mail.yaml
+    interval: 86400
+  china:
+    behavior: domain
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/China/China_Domain.yaml
+    interval: 86400
+  lan-cidr:
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Lan/Lan.yaml
+    interval: 86400
+
+rules:
+  - RULE-SET,mail,✉️Mail
+  - RULE-SET,telegram,✈️Telegram
+  - RULE-SET,netflix,📽️Netflix
+  - RULE-SET,netflix-ip,📽️Netflix
+  - RULE-SET,youtube,📽️YouTube
+  - RULE-SET,disney,📽️Disney+
+  - RULE-SET,foreign-media,📽️ForeignMedia
+  - RULE-SET,openai,🤖chatGPT
+  - RULE-SET,apple,🍎Apple
+  - RULE-SET,global,🌎Global
+  - RULE-SET,china,DIRECT
+  - RULE-SET,lan-cidr,DIRECT
+  - GEOIP,CN,DIRECT
+  - MATCH,🌎Global
